@@ -21,17 +21,21 @@ public class AuthInterceptor implements HandlerInterceptor {
                              HttpServletResponse response, Object handler) throws BusinessException {
 
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider();
-        MemberRole loginMemberRole = jwtTokenProvider.getRole(parseToken(request.getHeader("Authorization")));//현재 로그인한 멤버의 권한
+        try {
+            MemberRole loginMemberRole = jwtTokenProvider.getRole(parseToken(request.getHeader("Authorization")));//현재 로그인한 멤버의 권한
+            MemberRole accessRole = Objects.requireNonNull(((HandlerMethod) handler).getMethodAnnotation(AccessType.class)).role(); //접근 권한
 
-        MemberRole accessRole = Objects.requireNonNull(((HandlerMethod) handler).getMethodAnnotation(AccessType.class)).role(); //접근 권한
+            if (accessRole == MemberRole.ADMIN && loginMemberRole == MemberRole.ADMIN)
+                return true;
 
-        if (accessRole == MemberRole.ADMIN && loginMemberRole == MemberRole.ADMIN)
-            return true;
+            if (accessRole == MemberRole.USER && loginMemberRole != null)
+                return true;
 
-        if (accessRole == MemberRole.USER && loginMemberRole != null)
-            return true;
-
-        throw new BusinessException(ErrorCode.NOT_AUTHENTICATED);
+            throw new BusinessException(ErrorCode.NOT_AUTHENTICATED);
+        }  catch (NullPointerException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     private String parseToken(String authHeader) {
